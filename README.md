@@ -1,5 +1,7 @@
 # citation-check
 
+Open [samples/citation-report.md](samples/citation-report.md) first. The memo it came from is [samples/memo.md](samples/memo.md).
+
 Checks the *form* of US case citations in a markdown memo: volume, reporter, page, optional pincite, court, year, plus `Id.` antecedents.
 
 Not a citator. Not legal advice. It will not tell you the case is real, good law, or on point.
