@@ -1,28 +1,28 @@
-# Memorandum
+# Note
 
-To: Harbor Street file
+To: Harbour file
 From: A. Okonkwo
-Date: March 3, 2026
-Re: Northline Data — fictional permit note
+Date: 3 March 2026
+Re: Whether the cap survives
 
-This note is fiction. It is not legal advice, and the citations below are planted so a form checker has something to fail.
+This note is fiction. It checks citation form. It is not advice on the clause.
 
-## Question presented
+## Question
 
-Id. at 14. Whether a planning board may condition a data-center permit on a noise study is the question the chair asked at the continued hearing. No full citation appears before that signal, which is the point of this paragraph.
+ibid [14]. The question is whether a twelve-month claim period in a business-to-business services contract takes effect as a matter of construction. Nothing is cited before that short form.
 
 ## Discussion
 
-The board's counsel later pointed at Northline Data LLC v. County of Harbor, 512 F.3d 840 (9th Cir. 2008). That opinion, on these fictional facts, treated a generator-test condition as within the board's written rules. Id. at 844. The same case comes up again when staff discusses the appeal path: Northline Data LLC v. County of Harbor, 512 F.3d 840 (9th Cir. 2008). Repeating the full cite is harmless, and the checker should mark the second one as repeated rather than as a new authority.
+The draft relies on [2018] EWCA Civ 214, [2019] QB 112. On these invented facts the judgment is said to treat a clear time-bar as a matter of construction. ibid [22].
 
-A draft footnote in the staff report is missing the year: Harbor Neighbors v. Northline, 88 F. Supp. 2d 12 (D. Or.). The parenthetical names a court and stops. That is a malformed cite, not a holding.
+The same neutral citation is set out again when the note turns to the order: [2018] EWCA Civ 214.
 
-Nothing in this memo says the board must deny the permit. The applicant's brief, which does not exist, is summarized only to show the shape of an argument: noise at the property line, a twelve-month study, and a claim that the comprehensive plan already studied the corridor in 2019. Those sentences are background. They are not citations.
+A footnote has lost its number: [2024] EWHC (Comm). Year and court, then a bracket.
 
-Counsel also wrote "see Id. at 110" after the Ninth Circuit cite above, so that short form has an antecedent. Id. at 110. A reader who starts at the Question presented still hits a short form with nowhere to go. The checker cares about order in the file, not about what a human would infer from a caption.
+The same footnote also contains 512 F.3d 840. That is a US reporter. It is the wrong form for a note on English law.
 
-The rest of this paragraph is padding so the sample is about two pages and still short enough to read. The parcel is fictional. The board is fictional. The docket number on the notice was PB-2026-14. Dates in the notice were January 12, 2026 for the first hearing and February 9, 2026 for the continuance. None of those are case citations. A volume-reporter-page string is. "Section 4.2 of the zoning code" is not. "Table 2" is not.
+The contract is governed by the law of England and Wales. The clause says a claim must be brought within twelve months of the cause of action accruing. The Limitation Act 1980 is the statute a reader would open. Naming the Act is not a case citation. Nor is clause 8.2, nor section 2(1) of the Unfair Contract Terms Act 1977.
 
-If someone later wires COURT_LISTENER_TOKEN, this tool still does not decide whether 512 F.3d 840 is the right case for a noise condition. Existence is a different job from form. The committed sample report was produced with the token unset.
+ibid [30].
 
-End of note.
+Nothing here says the cap is or is not enforceable.

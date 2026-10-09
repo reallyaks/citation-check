@@ -1,25 +1,29 @@
-"""US case-citation form checker. Offline. Not a citator."""
+"""Form check for English case citations. Offline. Not a citator."""
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 
-REPORTER = (
-    r"F\.4th|F\.3d|F\.2d|F\. Supp\. 3d|F\. Supp\. 2d|F\. Supp\.|"
-    r"U\.S\.|S\. Ct\.|L\. Ed\. 2d|A\.3d|A\.2d|N\.E\.3d|N\.W\.2d|"
-    r"P\.3d|S\.E\.2d|So\. 3d|S\.W\.3d|Cal\. App\. 5th|N\.Y\.3d"
+NEUTRAL_RE = re.compile(
+    r"\[(?P<year>(?:19|20)\d{2})\]\s+"
+    r"(?P<court>UKSC|UKPC|EWCA\s+Civ|EWCA\s+Crim|EWHC|UKUT|UKFTT)\s+"
+    r"(?P<number>\d+)(?:\s+\((?P<division>[^)]{1,40})\))?",
+    re.IGNORECASE,
 )
-FULL_RE = re.compile(
-    rf"(?<!\w)(?P<volume>\d{{1,4}})[\t ]+(?P<reporter>{REPORTER})[\t ]+"
-    rf"(?P<page>\d{{1,5}})(?:[\t ]*,[\t ]*(?P<pincite>\d{{1,5}}(?:[\t ]*[-–][\t ]*\d{{1,5}})?))?[\t ]*"
-    rf"\((?:(?P<court>[^()]{{1,80}}?)[\t ]+)?(?P<year>(?:17|18|19|20)\d{{2}})\)"
+BROKEN_NEUTRAL_RE = re.compile(
+    r"\[(?P<year>(?:19|20)\d{2})\]\s+"
+    r"(?P<court>UKSC|UKPC|EWCA\s+Civ|EWCA\s+Crim|EWHC|UKUT|UKFTT)\s+"
+    r"\((?P<division>[^)]{1,40})\)",
+    re.IGNORECASE,
 )
-MISSING_YEAR_RE = re.compile(
-    rf"(?<!\w)(?P<volume>\d{{1,4}})[\t ]+(?P<reporter>{REPORTER})[\t ]+"
-    rf"(?P<page>\d{{1,5}})(?:[\t ]*,[\t ]*(?P<pincite>\d{{1,5}}))?[\t ]*"
-    rf"\((?P<court>[^()]{{1,80}})\)"
+REPORT_RE = re.compile(
+    r"\[(?P<year>(?:19|20)\d{2})\]\s+(?:(?P<volume>\d+)\s+)?"
+    r"(?P<series>AC|QB|Ch|Fam|WLR|All ER)\s+(?P<page>\d+)"
 )
-ID_RE = re.compile(r"(?<!\w)Id\.(?:[\t ]+at[\t ]+(?P<pincite>\d{1,5}))?", re.IGNORECASE)
+US_RE = re.compile(
+    r"\b\d{1,4}\s+(?:F\.4th|F\.3d|F\.2d|F\.\s*Supp\.(?:\s*3d|\s*2d)?|U\.S\.|S\.\s*Ct\.)\s+\d+"
+)
+IBID_RE = re.compile(r"(?<!\w)ibid\.?(?:\s+\[?(?P<pin>\d+)\]?)?", re.IGNORECASE)
 
 
 @dataclass
@@ -28,12 +32,11 @@ class Hit:
     text: str
     start: int
     detail: str
-    volume: str = ""
-    reporter: str = ""
-    page: str = ""
     year: str = ""
     court: str = ""
-    pincite: str = ""
+    number: str = ""
+    series: str = ""
+    page: str = ""
 
 
 @dataclass
@@ -42,107 +45,122 @@ class Report:
 
     @property
     def parsed(self) -> list[Hit]:
-        return [h for h in self.hits if h.kind == "full"]
+        return [hit for hit in self.hits if hit.kind in {"neutral", "report"}]
 
     @property
     def malformed(self) -> list[Hit]:
-        return [h for h in self.hits if h.kind == "malformed"]
+        return [hit for hit in self.hits if hit.kind == "malformed"]
 
     @property
-    def id_no_antecedent(self) -> list[Hit]:
-        return [h for h in self.hits if h.kind == "id-no-antecedent"]
+    def ibid_no_antecedent(self) -> list[Hit]:
+        return [hit for hit in self.hits if hit.kind == "ibid-no-antecedent"]
 
     @property
     def repeated(self) -> list[Hit]:
-        return [h for h in self.hits if h.kind == "repeated"]
+        return [hit for hit in self.hits if hit.kind == "repeated"]
+
+    @property
+    def us_reporter(self) -> list[Hit]:
+        return [hit for hit in self.hits if hit.kind == "us-reporter"]
+
+
+def _overlaps(start: int, end: int, spans: list[tuple[int, int]]) -> bool:
+    return any(not (end <= left or start >= right) for left, right in spans)
 
 
 def parse_memo(text: str) -> Report:
     spans: list[tuple[int, int, Hit]] = []
-    for match in FULL_RE.finditer(text):
-        hit = Hit(
-            kind="full",
-            text=match.group(0),
-            start=match.start(),
-            detail="full cite",
-            volume=match.group("volume"),
-            reporter=match.group("reporter"),
-            page=match.group("page"),
-            year=match.group("year"),
-            court=(match.group("court") or "").strip(),
-            pincite=match.group("pincite") or "",
+    occupied: list[tuple[int, int]] = []
+
+    def take(start: int, end: int, hit: Hit) -> None:
+        if _overlaps(start, end, occupied):
+            return
+        occupied.append((start, end))
+        spans.append((start, end, hit))
+
+    for match in NEUTRAL_RE.finditer(text):
+        take(
+            match.start(),
+            match.end(),
+            Hit(
+                kind="neutral",
+                text=match.group(0),
+                start=match.start(),
+                detail="neutral citation",
+                year=match.group("year"),
+                court=re.sub(r"\s+", " ", match.group("court")),
+                number=match.group("number"),
+            ),
         )
-        spans.append((match.start(), match.end(), hit))
-    occupied = [(a, b) for a, b, _ in spans]
-    for match in MISSING_YEAR_RE.finditer(text):
-        if any(not (match.end() <= a or match.start() >= b) for a, b in occupied):
-            continue
-        spans.append(
-            (
-                match.start(),
-                match.end(),
-                Hit(
-                    kind="malformed",
-                    text=match.group(0),
-                    start=match.start(),
-                    detail="missing year",
-                    volume=match.group("volume"),
-                    reporter=match.group("reporter"),
-                    page=match.group("page"),
-                    court=(match.group("court") or "").strip(),
-                    pincite=match.group("pincite") or "",
-                ),
-            )
+    for match in BROKEN_NEUTRAL_RE.finditer(text):
+        take(
+            match.start(),
+            match.end(),
+            Hit(
+                kind="malformed",
+                text=match.group(0),
+                start=match.start(),
+                detail="neutral citation with no case number",
+                year=match.group("year"),
+                court=re.sub(r"\s+", " ", match.group("court")),
+            ),
         )
-    for match in ID_RE.finditer(text):
-        spans.append(
-            (
-                match.start(),
-                match.end(),
-                Hit(
-                    kind="id",
-                    text=match.group(0),
-                    start=match.start(),
-                    detail="id",
-                    pincite=match.group("pincite") or "",
-                ),
-            )
+    for match in REPORT_RE.finditer(text):
+        take(
+            match.start(),
+            match.end(),
+            Hit(
+                kind="report",
+                text=match.group(0),
+                start=match.start(),
+                detail="law report",
+                year=match.group("year"),
+                series=match.group("series"),
+                page=match.group("page"),
+                number=match.group("volume") or "",
+            ),
         )
+    for match in US_RE.finditer(text):
+        take(
+            match.start(),
+            match.end(),
+            Hit(
+                kind="us-reporter",
+                text=match.group(0),
+                start=match.start(),
+                detail="US reporter. Not a neutral citation and not a law report used in England and Wales.",
+            ),
+        )
+    for match in IBID_RE.finditer(text):
+        take(
+            match.start(),
+            match.end(),
+            Hit(kind="ibid", text=match.group(0), start=match.start(), detail="ibid", page=match.group("pin") or ""),
+        )
+
     spans.sort(key=lambda item: item[0])
     report = Report()
-    last_full: Hit | None = None
+    last: Hit | None = None
     seen: dict[tuple[str, str, str], int] = {}
     for _, _, hit in spans:
-        if hit.kind == "full":
-            key = (hit.volume, hit.reporter, hit.page)
+        if hit.kind in {"neutral", "report"}:
+            key = (hit.kind, hit.year, hit.number if hit.kind == "neutral" else f"{hit.series} {hit.page}")
+            if hit.kind == "neutral":
+                key = ("neutral", f"{hit.year} {hit.court}", hit.number)
             seen[key] = seen.get(key, 0) + 1
             if seen[key] > 1:
                 hit.kind = "repeated"
-                hit.detail = f"repeats {hit.volume} {hit.reporter} {hit.page}"
-            last_full = hit if hit.kind == "full" else last_full
-            if hit.kind == "repeated":
-                # still a usable antecedent
-                last_full = Hit(
-                    kind="full",
-                    text=hit.text,
-                    start=hit.start,
-                    detail="full cite",
-                    volume=hit.volume,
-                    reporter=hit.reporter,
-                    page=hit.page,
-                    year=hit.year,
-                    court=hit.court,
-                )
+                hit.detail = "repeats an earlier citation"
+            last = hit
             report.hits.append(hit)
-        elif hit.kind == "malformed":
+        elif hit.kind == "ibid":
+            if last is None or last.kind not in {"neutral", "report", "repeated"}:
+                hit.kind = "ibid-no-antecedent"
+                hit.detail = "ibid appears before any neutral citation or law report"
+            else:
+                hit.detail = f"follows {last.text}"
             report.hits.append(hit)
         else:
-            if last_full is None:
-                hit.kind = "id-no-antecedent"
-                hit.detail = "Id. appears before any full citation"
-            else:
-                hit.detail = f"antecedent {last_full.volume} {last_full.reporter} {last_full.page}"
-                hit.kind = "id"
             report.hits.append(hit)
     return report
 
@@ -151,17 +169,18 @@ def render(report: Report, source: str) -> str:
     lines = [
         f"# Citation report — {source}",
         "",
-        "Form check only. This does not confirm that a case exists or that a pincite is accurate.",
-        "Offline by default. Set COURT_LISTENER_TOKEN to attempt a lookup; this sample report did not.",
+        "Form only, for a memo written to English citation practice: neutral citations, the main law reports, and ibid.",
+        "It does not confirm that a case exists, or that the pinpoint is right. A US reporter is flagged because it is the wrong form here, not because the case was read.",
         "",
         "## Counts",
         "",
         "| | |",
         "| --- | --- |",
-        f"| parsed | {len(report.parsed)} |",
+        f"| neutral or law report | {len(report.parsed)} |",
         f"| malformed | {len(report.malformed)} |",
-        f"| Id. with no antecedent | {len(report.id_no_antecedent)} |",
+        f"| ibid with no antecedent | {len(report.ibid_no_antecedent)} |",
         f"| repeated | {len(report.repeated)} |",
+        f"| US reporter | {len(report.us_reporter)} |",
         "",
         "## Hits",
         "",
